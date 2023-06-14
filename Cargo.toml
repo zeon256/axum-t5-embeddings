@@ -1,0 +1,24 @@
+[package]
+name = "axum-t5-embeddings"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.71"
+axum = "0.6.18"
+mimalloc = "0.1.37"
+rust-bert = { version = "0.21.0"}
+serde = "1.0.164"
+tokio = { version = "1.28.2", features = ["full"] }
+tracing-subscriber = { version="0.3", features = ["env-filter"] }
+
+
+[profile.dev.package.torch-sys]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = true
