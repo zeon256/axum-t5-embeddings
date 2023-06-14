@@ -1,4 +1,4 @@
-use std::sync::{Arc};
+use std::{sync::{Arc}, env};
 
 use axum::{
     extract::{Json, State},
@@ -57,13 +57,14 @@ async fn feature_extraction(
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Set the RUST_LOG, if it hasn't been explicitly defined
+    let path = "YOUR_PATH_TO_MODEL";
     
-    std::env::set_var("RUST_LOG", "axum_instructor=debug,tower_http=debug");
+    // Initialize logging
+    env::set_var("RUST_LOG", "axum_instructor=debug,tower_http=debug");
     tracing_subscriber::fmt::init();
     
     // Set-up sentence embeddings model
-    let model = SentenceEmbeddingsBuilder::local("/home/zeon256/Documents/work/copilot/text-generation-webui2/models/hkunlp_instructor-large/")
+    let model = SentenceEmbeddingsBuilder::local(path)
         .create_model()?;
 
     let model = Arc::new(Mutex::new(model));
