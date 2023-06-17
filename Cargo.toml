@@ -7,12 +7,17 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.71"
-axum = "0.6.18"
+axum = {version = "0.6.18", features = ["tracing", "http2"]}
 mimalloc = "0.1.37"
 rust-bert = { version = "0.21.0"}
 serde = "1.0.164"
 tokio = { version = "1.28.2", features = ["full"] }
 tracing-subscriber = { version="0.3", features = ["env-filter"] }
+argh = "0.1.10"
+tracing = "0.1"
+tower = "0.4.13"
+tower-http = { version = "0.4.0", features = ["trace"] }
+object-pool = { git = "https://github.com/CJP10/object-pool.git", commit = "744afad" }
 
 
 [profile.dev.package.torch-sys]
