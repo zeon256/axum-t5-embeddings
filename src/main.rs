@@ -1,4 +1,4 @@
-use std::{sync::Arc};
+use std::sync::Arc;
 
 use axum::{
     extract::{Json, State},
@@ -17,7 +17,7 @@ use mimalloc::MiMalloc;
 use tokio::sync::Semaphore;
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 mod args;
 
@@ -52,11 +52,13 @@ async fn feature_extraction(
     State(protected_pool): State<Arc<ProtectedPool>>,
     Json(payload): Json<FeatureExtraction>,
 ) -> Result<Json<Vec<Vec<f64>>>, AppError> {
-    
     let payload = payload.inputs;
 
     let permit = protected_pool.semaphore.acquire().await.unwrap();
-    debug!("Acquired permit from semaphore, available permits: {:?}", protected_pool.semaphore.available_permits());
+    debug!(
+        "Acquired permit from semaphore, available permits: {:?}",
+        protected_pool.semaphore.available_permits()
+    );
     let model = protected_pool.pool.try_pull().unwrap();
 
     let sentence_embeddings = model
@@ -64,7 +66,10 @@ async fn feature_extraction(
         .map_err(|_| AppError::FeatureExtractionError("Failed to encode tensor"))?;
 
     drop(permit);
-    debug!("Permit returned to semaphore, available permits: {:?}", protected_pool.semaphore.available_permits());
+    debug!(
+        "Permit returned to semaphore, available permits: {:?}",
+        protected_pool.semaphore.available_permits()
+    );
 
     let embeddings = sentence_embeddings
         .embeddings
@@ -77,7 +82,6 @@ async fn feature_extraction(
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Initialize logging
-    // env::set_var("RUST_LOG", "axum_t5_embeddings=debug,tower_http=debug");
     tracing_subscriber::fmt::init();
 
     let args: args::Args = argh::from_env();
@@ -89,13 +93,12 @@ async fn main() -> anyhow::Result<()> {
         model,
     } = args;
 
-
     let ip = if listen { "0.0.0.0" } else { "127.0.0.1" };
 
     let addr = format!("{}:{}", ip, port);
     let mut buffer = Vec::with_capacity(no_workers);
 
-    for _ in 0..no_workers {    
+    for _ in 0..no_workers {
         info!("Loaded model: {:?}", &model);
         buffer.push(SentenceEmbeddingsBuilder::local(&model).create_model()?);
     }
