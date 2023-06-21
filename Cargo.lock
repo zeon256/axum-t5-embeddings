@@ -150,6 +150,7 @@ dependencies = [
  "axum",
  "mimalloc",
  "object-pool",
+ "parking_lot 0.12.1",
  "rust-bert",
  "serde",
  "tokio",

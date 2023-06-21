@@ -8,6 +8,7 @@ use axum::{
     Router,
 };
 use object_pool::Pool;
+use parking_lot::Mutex;
 use rust_bert::pipelines::sentence_embeddings::{
     SentenceEmbeddingsBuilder, SentenceEmbeddingsModel,
 };
@@ -49,27 +50,17 @@ pub struct ProtectedPool {
 }
 
 async fn feature_extraction(
-    State(protected_pool): State<Arc<ProtectedPool>>,
+    State(protected_pool): State<Arc<Mutex<SentenceEmbeddingsModel>>>,
     Json(payload): Json<FeatureExtraction>,
 ) -> Result<Json<Vec<Vec<f64>>>, AppError> {
     let payload = payload.inputs;
+    let model = protected_pool.lock();
 
-    let permit = protected_pool.semaphore.acquire().await.unwrap();
-    debug!(
-        "Acquired permit from semaphore, available permits: {:?}",
-        protected_pool.semaphore.available_permits()
-    );
-    let model = protected_pool.pool.try_pull().unwrap();
+    debug!("Acquired lock");
 
     let sentence_embeddings = model
         .encode_as_tensor(payload.as_ref())
         .map_err(|_| AppError::FeatureExtractionError("Failed to encode tensor"))?;
-
-    drop(permit);
-    debug!(
-        "Permit returned to semaphore, available permits: {:?}",
-        protected_pool.semaphore.available_permits()
-    );
 
     let embeddings = sentence_embeddings
         .embeddings
@@ -96,27 +87,20 @@ async fn main() -> anyhow::Result<()> {
     let ip = if listen { "0.0.0.0" } else { "127.0.0.1" };
 
     let addr = format!("{}:{}", ip, port);
-    let mut buffer = Vec::with_capacity(no_workers);
-
-    for _ in 0..no_workers {
-        info!("Loaded model: {:?}", &model);
-        buffer.push(SentenceEmbeddingsBuilder::local(&model).create_model()?);
-    }
 
     info!("Starting server: {}", addr);
 
-    let pool = Arc::new(Pool::from_vec(buffer));
+    let protected_model = Arc::new(Mutex::new(
+        SentenceEmbeddingsBuilder::local(&model).create_model()?,
+    ));
 
-    let protected_pool = Arc::new(ProtectedPool {
-        semaphore: Arc::new(Semaphore::new(no_workers)),
-        pool,
-    });
+    info!("Loaded model: {:?}", &model);
 
     // build our application with a single route
     let app = Router::new()
         .route("/feature-extraction", post(feature_extraction))
         .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()))
-        .with_state(protected_pool);
+        .with_state(protected_model);
 
     axum::Server::bind(&addr.parse()?)
         .serve(app.into_make_service())
